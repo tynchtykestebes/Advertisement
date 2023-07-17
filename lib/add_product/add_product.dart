@@ -1,9 +1,12 @@
+import 'dart:io';
+
 import 'package:advertisement/components/custom_text_field.dart';
 import 'package:advertisement/constants/app_size.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 class AddProduct extends StatefulWidget {
-  const AddProduct({super.key});
+  const AddProduct({Key? key}) : super(key: key);
 
   @override
   State<AddProduct> createState() => _AddProductState();
@@ -16,6 +19,18 @@ class _AddProductState extends State<AddProduct> {
   final _dateTime = TextEditingController();
   final _phoneNumber = TextEditingController();
   final _address = TextEditingController();
+
+  List<File> _selectedImages = [];
+
+  Future<void> _pickImagesFromGallery() async {
+    final picker = ImagePicker();
+    final pickedImages = await picker.pickMultiImage();
+
+    setState(() {
+      _selectedImages = pickedImages.map((pickedImage) => File(pickedImage.path)).toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -38,16 +53,18 @@ class _AddProductState extends State<AddProduct> {
               hintText: 'Write the description',
             ),
             AppSize.height10,
-            CustomTextField(
-              prefixIcon: Center(
-                child: IconButton(
-                  onPressed: () {},
-                  icon: const Icon(Icons.photo_camera),
-                ),
+            if (_selectedImages.isNotEmpty)
+              Column(
+                children: [
+                  for (final imageFile in _selectedImages)
+                    Image.file(imageFile),
+                ],
+              )
+            else
+              IconButton(
+                onPressed: _pickImagesFromGallery,
+                icon: const Icon(Icons.photo_camera),
               ),
-              maxLines: 5,
-              controller: _description,
-            ),
             AppSize.height10,
             CustomTextField(
               controller: _name,
