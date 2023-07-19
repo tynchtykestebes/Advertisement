@@ -1,9 +1,10 @@
 import 'dart:io';
-
 import 'package:advertisement/components/custom_text_field.dart';
 import 'package:advertisement/constants/app_size.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart' as firebase_storage;
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AddProduct extends StatefulWidget {
   const AddProduct({Key? key}) : super(key: key);
@@ -27,8 +28,57 @@ class _AddProductState extends State<AddProduct> {
     final pickedImages = await picker.pickMultiImage();
 
     setState(() {
-      _selectedImages = pickedImages.map((pickedImage) => File(pickedImage.path)).toList();
+      _selectedImages =
+          pickedImages.map((pickedImage) => File(pickedImage.path)).toList();
     });
+  }
+
+  Future<void> _uploadDataAndImages() async {
+    final title = _title.text;
+    final description = _description.text;
+    final name = _name.text;
+    final dateTime = _dateTime.text;
+    final phoneNumber = _phoneNumber.text;
+    final address = _address.text;
+
+    // Upload images to Firebase Storage
+    final List<String> imageUrls = [];
+    for (final imageFile in _selectedImages) {
+      final ref = firebase_storage.FirebaseStorage.instance
+          .ref()
+          .child('product_images')
+          .child('${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+      final uploadTask = ref.putFile(imageFile);
+      final snapshot = await uploadTask.whenComplete(() {});
+      final imageUrl = await snapshot.ref.getDownloadURL();
+      imageUrls.add(imageUrl);
+    }
+
+    // Save data and image URLs to Firestore
+    await FirebaseFirestore.instance.collection('products').add({
+      'title': title,
+      'description': description,
+      'name': name,
+      'dateTime': dateTime,
+      'phoneNumber': phoneNumber,
+      'address': address,
+      'imageUrls': imageUrls,
+    });
+
+    // Clear input fields and selected images
+    _title.clear();
+    _description.clear();
+    _name.clear();
+    _dateTime.clear();
+    _phoneNumber.clear();
+    _address.clear();
+    setState(() {
+      _selectedImages.clear();
+    });
+
+    
+    Navigator.pop(context);
   }
 
   @override
@@ -54,11 +104,18 @@ class _AddProductState extends State<AddProduct> {
             ),
             AppSize.height10,
             if (_selectedImages.isNotEmpty)
-              Column(
-                children: [
-                  for (final imageFile in _selectedImages)
-                    Image.file(imageFile),
-                ],
+              SizedBox(
+                height: 150,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _selectedImages.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Image.file(_selectedImages[index]),
+                    );
+                  },
+                ),
               )
             else
               IconButton(
@@ -84,6 +141,12 @@ class _AddProductState extends State<AddProduct> {
             CustomTextField(
               controller: _address,
               hintText: 'Write your address',
+            ),
+            AppSize.height10,
+            ElevatedButton.icon(
+              onPressed: _uploadDataAndImages,
+              icon: const Icon(Icons.upload_outlined),
+              label: const Text('Upload'),
             ),
           ],
         ),
